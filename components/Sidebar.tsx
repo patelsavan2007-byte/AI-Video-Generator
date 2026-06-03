@@ -8,25 +8,45 @@ import {
   Settings, 
   Sparkles, 
   LogOut, 
-  User, 
   Video 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/auth-context";
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   credits: number;
+  userName?: string;
+  userEmail?: string;
+  userAvatar?: string;
 }
 
-export function Sidebar({ activeTab, setActiveTab, credits }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, credits, userName, userEmail, userAvatar }: SidebarProps) {
+  const { signOut } = useAuth();
+
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "generate", label: "Generate", icon: Tv },
     { id: "history", label: "History", icon: History },
     { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  /** Get user initials for the avatar fallback */
+  const getInitials = (name?: string, email?: string): string => {
+    if (name) {
+      const parts = name.trim().split(" ");
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return name.slice(0, 2).toUpperCase();
+    }
+    if (email) return email.slice(0, 2).toUpperCase();
+    return "VF";
+  };
+
+  const displayName = userName || "VisionForge User";
+  const displayEmail = userEmail || "user@visionforge.ai";
+  const initials = getInitials(userName, userEmail);
 
   return (
     <aside className="w-64 border-r border-white/5 bg-[#0b0b14]/70 backdrop-blur-xl flex flex-col h-screen sticky top-0">
@@ -98,19 +118,28 @@ export function Sidebar({ activeTab, setActiveTab, credits }: SidebarProps) {
 
       {/* User Profile */}
       <div className="p-4 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-300 font-semibold font-mono">
-            CR
-          </div>
-          <div>
-            <h4 className="text-xs font-semibold text-white">Creator Account</h4>
-            <p className="text-[10px] text-zinc-500">creator@visionforge.ai</p>
+        <div className="flex items-center gap-3 min-w-0">
+          {userAvatar ? (
+            <img
+              src={userAvatar}
+              alt={displayName}
+              className="h-9 w-9 rounded-full border border-white/10 object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-purple-600/60 to-blue-500/60 border border-white/10 flex items-center justify-center text-zinc-200 text-xs font-bold font-mono shrink-0">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h4 className="text-xs font-semibold text-white truncate">{displayName}</h4>
+            <p className="text-[10px] text-zinc-500 truncate">{displayEmail}</p>
           </div>
         </div>
         <button 
-          title="Sign Out (Disabled)"
-          className="text-zinc-500 hover:text-zinc-300 transition-colors p-1.5 rounded-lg hover:bg-white/5"
-          disabled
+          title="Sign Out"
+          onClick={signOut}
+          className="text-zinc-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-white/5 shrink-0"
         >
           <LogOut className="h-4 w-4" />
         </button>

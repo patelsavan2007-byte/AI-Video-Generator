@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { AuthPage } from "@/components/AuthPage";
 import { Sidebar } from "@/components/Sidebar";
 import { DashboardTab } from "@/components/DashboardTab";
 import { GenerateTab } from "@/components/GenerateTab";
 import { HistoryTab } from "@/components/HistoryTab";
 import { SettingsTab } from "@/components/SettingsTab";
+import { Loader2 } from "lucide-react";
 
 export interface VideoItem {
   id: string;
@@ -68,6 +71,8 @@ const initialMockHistory: VideoItem[] = [
 ];
 
 export default function Home() {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [credits, setCredits] = useState<number>(840);
   const [history, setHistory] = useState<VideoItem[]>(initialMockHistory);
@@ -187,6 +192,24 @@ export default function Home() {
     }, intervalTime);
   };
 
+  // ── Loading State ──────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050508]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 text-purple-500 animate-spin" />
+          <p className="text-zinc-500 text-sm font-medium">Loading VisionForge AI...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Auth Gate ──────────────────────────────────────────────────
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
+  // ── Authenticated Studio ──────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-[#050508] relative">
       {/* Background Soft Glow Effects */}
@@ -197,7 +220,10 @@ export default function Home() {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        credits={credits} 
+        credits={credits}
+        userName={user?.name}
+        userEmail={user?.email}
+        userAvatar={user?.avatar}
       />
 
       {/* Main Studio Viewport */}
