@@ -1,0 +1,149 @@
+# ─────────────────────────────────────────────────────────────
+#  VisionForge 2.0 — Docker Compose
+#
+#  Three logical tiers:
+#    Infra tier  : postgres + redis      (always on)
+#    App tier    : api + frontend + nginx (docker compose up)
+#    GPU tier    : worker-gpu            (docker compose --profile gpu up)
+#    Debug tier  : worker-debug          (docker compose --profile debug up)
+#
+#  Quick start (no GPU):
+#    cp .env.example .env
+#    docker compose --profile debug up --build
+#
+#  Full GPU start:
+#    docker compose --profile gpu up --build
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Infrastructure ──────────────────────────────────────────
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: ${POSTGRES_DB:-visionforge}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vf} -d ${POSTGRES_DB:-visionforge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── App Tier (CPU-only) ──────────────────────────────────────
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_vol:/media
+      - ../backend:/app          # live reload in dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules       # anonymous volume keeps node_modules inside container
+      - /app/.next
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - media_vol:/media:ro      # serve video files directly — zero FastAPI overhead
+    depends_on:
+      - api
+      - frontend
+
+  # ── Worker Tier — Debug (no GPU) ────────────────────────────
+
+  worker-debug:
+    profiles: [debug]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile    # reuses the same lightweight API image
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DEBUG_MODE: "true"
+    volumes:
+      - media_vol:/media
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A worker_app worker -Q video_gen --concurrency=2 --loglevel=info
+
+  # ── Worker Tier — GPU ────────────────────────────────────────
+
+  worker-gpu:
+    profiles: [gpu]
+    build:
+      context: ../worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DEBUG_MODE: "false"
+    volumes:
+      - media_vol:/media
+      - ../backend:/app          # shares the same task code
+      - ${WAN2_MODEL_PATH:-/tmp/models}:/models   # host model weights
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A worker_app worker -Q video_gen --concurrency=${MAX_CONCURRENT_JOBS:-2} --loglevel=info
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  pg_data:
+  media_vol:

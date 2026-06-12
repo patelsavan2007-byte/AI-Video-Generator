@@ -1,0 +1,185 @@
+
+<h2 class="sr-only">End-to-end AI text-to-video system architecture with interactive request flow</h2>
+<style>
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.arch{display:flex;flex-direction:column;gap:5px;padding:4px 0 6px}
+.layer{border-radius:10px;padding:8px;border:1px dashed;position:relative}
+.llbl{font-size:11px;font-weight:500;position:absolute;top:-8px;left:10px;padding:0 4px;background:var(--color-background-primary);color:var(--color-text-secondary);white-space:nowrap}
+.boxes{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.box{flex:1;min-width:90px;border-radius:7px;padding:7px 9px;border:1px solid var(--color-border-tertiary);background:var(--color-background-secondary);border-left-width:3px;box-sizing:border-box;transition:opacity .25s}
+.bt{font-size:12.5px;font-weight:500;color:var(--color-text-primary);line-height:1.3}
+.bs{font-size:11px;color:var(--color-text-secondary);margin-top:2px;line-height:1.3}
+.bl{border-left-color:#7F77DD}.tl{border-left-color:#1D9E75}.al{border-left-color:#BA7517}.cl{border-left-color:#D85A30}.dl{border-left-color:#378ADD}.gl{border-left-color:#639922}
+.browser-l{border-color:rgba(127,119,221,.5);background:rgba(127,119,221,.04)}
+.api-l{border-color:rgba(29,158,117,.5);background:rgba(29,158,117,.04)}
+.queue-l{border-color:rgba(186,117,23,.5);background:rgba(186,117,23,.04)}
+.worker-l{border-color:rgba(216,90,48,.5);background:rgba(216,90,48,.04)}
+.db-l{border-color:rgba(55,138,221,.5);background:rgba(55,138,221,.04)}
+.storage-l{border-color:rgba(99,153,34,.5);background:rgba(99,153,34,.04)}
+.split{display:flex;gap:5px;flex-wrap:wrap}
+.split>:first-child{flex:3;min-width:200px}.split>:last-child{flex:2;min-width:160px}
+.bxcol{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.bxcol .box{flex:none;width:100%}
+.conn{font-size:11px;color:var(--color-text-tertiary);height:20px;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .25s}
+.conn::before,.conn::after{content:'';flex:1;height:1px;background:var(--color-border-tertiary);max-width:60px}
+.dimmed .aitem{opacity:.1}
+.dimmed .aitem.lit{opacity:1}
+.frow{display:flex;gap:4px;flex-wrap:wrap;margin-top:14px}
+.sb{width:28px;height:28px;border-radius:50%;border:1px solid var(--color-border-secondary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;cursor:pointer;color:var(--color-text-secondary);background:var(--color-background-secondary);transition:all .2s;user-select:none;flex-shrink:0}
+.sb:hover{border-color:var(--color-border-primary);color:var(--color-text-primary)}
+.sb.on{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info)}
+.sdesc{margin-top:8px;padding:11px 13px;border-radius:8px;background:var(--color-background-secondary);font-size:12.5px;color:var(--color-text-secondary);line-height:1.65;border:1px solid var(--color-border-tertiary);min-height:64px}
+.sdesc strong{color:var(--color-text-primary);font-weight:500}
+.sdesc code{font-family:var(--font-mono);font-size:11px;background:var(--color-background-tertiary);padding:1px 4px;border-radius:3px;color:var(--color-text-primary)}
+</style>
+
+<div class="arch" id="arch">
+
+  <div class="layer browser-l" id="lyr-browser">
+    <span class="llbl">Browser — React / Next.js · Axios · React Query</span>
+    <div class="boxes">
+      <div class="box bl aitem" id="b-auth"><div class="bt">Auth UI</div><div class="bs">Login · register · JWT store</div></div>
+      <div class="box bl aitem" id="b-prompt"><div class="bt">Prompt form</div><div class="bs">Text · duration · seed · fps · resolution</div></div>
+      <div class="box bl aitem" id="b-status"><div class="bt">Status poller</div><div class="bs">GET /v1/jobs/{id} every 2s</div></div>
+      <div class="box bl aitem" id="b-gallery"><div class="bt">Video gallery</div><div class="bs">Player · download · rerun</div></div>
+    </div>
+  </div>
+
+  <div class="conn aitem" id="arr-http">⇅ &nbsp; HTTPS · REST · JWT Bearer token</div>
+
+  <div class="layer api-l" id="lyr-api">
+    <span class="llbl">FastAPI backend — Pydantic · SQLAlchemy · Alembic · bcrypt · async handlers</span>
+    <div class="boxes">
+      <div class="box tl aitem" id="api-auth"><div class="bt">/auth</div><div class="bs">login · register · refresh · bcrypt verify</div></div>
+      <div class="box tl aitem" id="api-gen"><div class="bt">/v1/generate</div><div class="bs">validate · write job record · enqueue task</div></div>
+      <div class="box tl aitem" id="api-jobs"><div class="bt">/v1/jobs/{id}</div><div class="bs">status · cancel · rerun · progress</div></div>
+      <div class="box tl aitem" id="api-media"><div class="bt">/media/videos</div><div class="bs">stream local file · HTTP range requests</div></div>
+    </div>
+  </div>
+
+  <div class="conn aitem" id="arr-q">↓ &nbsp; enqueue Celery task &nbsp;·&nbsp; R/W PostgreSQL &nbsp;·&nbsp; Redis sessions</div>
+
+  <div class="split">
+    <div class="layer queue-l" id="lyr-queue">
+      <span class="llbl">Task queue — Celery 5 + Redis 7 broker</span>
+      <div class="boxes">
+        <div class="box al aitem" id="q-broker"><div class="bt">Redis broker</div><div class="bs">kombu · serialized task payloads</div></div>
+        <div class="box al aitem" id="q-queue"><div class="bt">Celery queue</div><div class="bs">video_gen · priority levels · retries</div></div>
+        <div class="box al aitem" id="q-cache"><div class="bt">Job progress cache</div><div class="bs">SETEX progress · 120 s TTL</div></div>
+      </div>
+    </div>
+    <div class="layer db-l" id="lyr-db">
+      <span class="llbl">Persistent data stores</span>
+      <div class="boxes">
+        <div class="box dl aitem" id="db-pg"><div class="bt">PostgreSQL 15</div><div class="bs">users · videos · gen_jobs tables</div></div>
+        <div class="box dl aitem" id="db-redis"><div class="bt">Redis (data)</div><div class="bs">sessions · rate limits · API cache</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn aitem" id="arr-w">↓ &nbsp; task pickup &nbsp;·&nbsp; write progress to Redis &nbsp;·&nbsp; update job status in PostgreSQL</div>
+
+  <div class="split">
+    <div class="layer worker-l" id="lyr-workers">
+      <span class="llbl">Celery workers — GPU host (RTX 3090 / 4090) · PyTorch</span>
+      <div class="boxes">
+        <div class="box cl aitem" id="w-celery"><div class="bt">Worker ×N</div><div class="bs">task lifecycle · auto-retry · OOM guard · timeout</div></div>
+        <div class="box cl aitem" id="w-model"><div class="bt">Video gen model</div><div class="bs">Wan2.x · diffusion sampler · 30–50 steps</div></div>
+      </div>
+    </div>
+    <div class="layer db-l" id="lyr-pg">
+      <span class="llbl">PostgreSQL schema</span>
+      <div class="bxcol">
+        <div class="box dl aitem" id="pg-users"><div class="bt">users</div><div class="bs">id · email · password_hash · created_at · plan</div></div>
+        <div class="box dl aitem" id="pg-videos"><div class="bt">videos</div><div class="bs">id · user_id · prompt · video_url · thumbnail_url · status</div></div>
+        <div class="box dl aitem" id="pg-jobs"><div class="bt">gen_jobs</div><div class="bs">job_id · worker_id · progress · gpu_sec · error_msg · cost_usd</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn aitem" id="arr-s">↓ &nbsp; save MP4 + thumbnail · delete intermediates · update video_url in PostgreSQL</div>
+
+  <div class="layer storage-l" id="lyr-storage">
+    <span class="llbl">Local filesystem — /media/ (bind-mounted Docker volume)</span>
+    <div class="boxes">
+      <div class="box gl aitem" id="fs-videos"><div class="bt">/videos/YYYY/MM/</div><div class="bs">MP4 output · job_id.mp4</div></div>
+      <div class="box gl aitem" id="fs-thumbs"><div class="bt">/thumbnails/</div><div class="bs">JPEG preview · 480p · job_id.jpg</div></div>
+      <div class="box gl aitem" id="fs-inter"><div class="bt">/intermediates/</div><div class="bs">Frame PNGs · auto-deleted after encode</div></div>
+      <div class="box gl aitem" id="fs-up"><div class="bt">/uploads/</div><div class="bs">User image inputs · img2vid</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div style="border-top:1px solid var(--color-border-tertiary);padding-top:12px;margin-top:10px">
+  <div style="font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:7px">End-to-end request flow — click a step to highlight the path</div>
+  <div class="frow" id="fbtns"></div>
+  <div class="sdesc" id="sdesc">Click any step number to trace the request through the system.</div>
+</div>
+
+<script>
+const STEPS=[
+  {label:"Login",
+   lit:["b-auth","api-auth","db-pg","pg-users"],
+   desc:"<strong>1 · User login</strong> — Auth UI POSTs <code>{ email, password }</code> to <code>POST /auth/login</code>. FastAPI's bcrypt middleware looks up the user in PostgreSQL <code>users</code> table, verifies the password hash, signs a 24h JWT and returns it. Browser stores the token (localStorage or httpOnly cookie)."},
+  {label:"Submit prompt",
+   lit:["b-prompt","api-gen"],
+   desc:"<strong>2 · Submit prompt</strong> — User fills the Prompt Form (text, negative_prompt, duration, fps, resolution, seed, aspect_ratio). Browser POSTs JSON to <code>POST /v1/generate</code> with <code>Authorization: Bearer &lt;jwt&gt;</code>. FastAPI validates all fields with Pydantic."},
+  {label:"Enqueue",
+   lit:["api-gen","q-broker","q-queue","db-pg","pg-jobs","arr-q"],
+   desc:"<strong>3 · Enqueue task</strong> — FastAPI validates JWT, checks rate limits (Redis), writes a <code>queued</code> record to PostgreSQL <code>gen_jobs</code> (stores prompt + params), then calls <code>generate_video.delay(job_id, prompt, seed, …)</code> dispatching a Celery task to the Redis broker. Returns <code>{ job_id, status: 'queued' }</code> instantly — no blocking."},
+  {label:"Task pickup",
+   lit:["q-queue","q-broker","w-celery","pg-jobs","arr-w"],
+   desc:"<strong>4 · Task pickup</strong> — An idle Celery worker process on the GPU host subscribes to the queue. Redis broker delivers the serialized task payload. Worker atomically sets <code>gen_jobs.status → 'processing'</code> and <code>gen_jobs.worker_id</code> in PostgreSQL before starting inference."},
+  {label:"Inference",
+   lit:["w-model","w-celery","q-cache","fs-inter"],
+   desc:"<strong>5 · Video generation</strong> — Wan2.x diffusion model runs 30–50 denoising steps on the GPU. After every N steps the worker emits: <code>SETEX job:{id}:progress 120 {pct}</code> to Redis job cache. Raw frame PNGs are written to <code>/intermediates/job_id/frame_XXXX.png</code> during generation."},
+  {label:"Save output",
+   lit:["w-model","w-celery","fs-videos","fs-thumbs","fs-inter","pg-jobs","pg-videos","arr-s"],
+   desc:"<strong>6 · Save output</strong> — Inference done. Worker encodes frames → MP4 → saves to <code>/videos/YYYY/MM/job_id.mp4</code>. Generates 480p JPEG thumbnail → <code>/thumbnails/job_id.jpg</code>. Deletes <code>/intermediates/job_id/</code>. Updates PostgreSQL: <code>gen_jobs.status → 'completed'</code>, writes <code>gpu_seconds</code>, <code>cost_usd</code>; inserts final row into <code>videos</code> table with <code>video_url</code>."},
+  {label:"Poll status",
+   lit:["b-status","api-jobs","q-cache","pg-jobs"],
+   desc:"<strong>7 · Status polling</strong> — Browser Status Poller hits <code>GET /v1/jobs/{id}</code> every 2 seconds. FastAPI first checks Redis cache for a live progress value (fast path: ~1 ms). On completion it reads the final record from PostgreSQL and returns <code>{ status: 'completed', progress: 100, video_url, thumbnail_url }</code>."},
+  {label:"Serve video",
+   lit:["b-gallery","api-media","fs-videos"],
+   desc:"<strong>8 · Serve video</strong> — Gallery shows the thumbnail. User clicks play. Browser requests <code>GET /media/videos/job_id.mp4</code>. FastAPI's <code>FileResponse</code> (or <code>StreamingResponse</code>) reads the file from local filesystem and streams it with HTTP <code>206 Partial Content</code> range-request support — enabling seek without a full re-download."},
+  {label:"Regenerate",
+   lit:["b-gallery","api-jobs","q-broker","q-queue","arr-q"],
+   desc:"<strong>9 · Regenerate (optional)</strong> — User clicks rerun. Browser POSTs to <code>POST /v1/jobs/{id}/rerun</code> with an optional new seed. FastAPI clones the <code>gen_jobs</code> row (preserving the original), dispatches a fresh Celery task. Steps 4 → 8 repeat: same prompt, new seed → different output."},
+];
+
+const btns=document.getElementById('fbtns');
+const desc=document.getElementById('sdesc');
+const arch=document.getElementById('arch');
+let cur=null;
+
+STEPS.forEach((s,i)=>{
+  const b=document.createElement('div');
+  b.className='sb';
+  b.textContent=i+1;
+  b.title=s.label;
+  b.onclick=()=>pick(i,b);
+  btns.appendChild(b);
+});
+
+function pick(i,b){
+  const same=cur===b;
+  reset();
+  if(same)return;
+  cur=b;
+  b.classList.add('on');
+  arch.classList.add('dimmed');
+  STEPS[i].lit.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.add('lit');
+  });
+  desc.innerHTML=STEPS[i].desc;
+}
+
+function reset(){
+  if(cur){cur.classList.remove('on');cur=null;}
+  arch.classList.remove('dimmed');
+  document.querySelectorAll('.aitem.lit').forEach(e=>e.classList.remove('lit'));
+  desc.innerHTML='Click any step number to trace the request through the system.';
+}
+</script>
