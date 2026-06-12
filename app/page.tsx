@@ -1,294 +1,86 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { AuthPage } from "@/components/AuthPage";
-import { Sidebar } from "@/components/Sidebar";
-import { DashboardTab } from "@/components/DashboardTab";
-import { GenerateTab } from "@/components/GenerateTab";
-import { HistoryTab } from "@/components/HistoryTab";
-import { SettingsTab } from "@/components/SettingsTab";
-import { Loader2 } from "lucide-react";
-
-export interface VideoItem {
-  id: string;
-  prompt: string;
-  duration: string;
-  resolution: string;
-  fps: number;
-  style: string;
-  motion: number;
-  seed: string;
-  videoUrl: string;
-  createdAt: string;
-}
-
-// Visual style to matching public video URL mockups
-const styleVideoMockups: Record<string, string> = {
-  Cinematic: "https://assets.mixkit.co/videos/preview/mixkit-mysterious-foggy-forest-road-at-night-42861-large.mp4",
-  Anime: "https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-background-1611-large.mp4",
-  Realistic: "https://assets.mixkit.co/videos/preview/mixkit-slow-motion-shot-of-splashing-water-in-neon-purple-light-42862-large.mp4",
-  "Sci-Fi": "https://assets.mixkit.co/videos/preview/mixkit-futuristic-subway-station-with-neon-lights-44132-large.mp4",
-};
-
-const initialMockHistory: VideoItem[] = [
-  {
-    id: "hist-1",
-    prompt: "A futuristic samurai walking in neon Tokyo during heavy rain",
-    duration: "5",
-    resolution: "1080p",
-    fps: 30,
-    style: "Sci-Fi",
-    motion: 8,
-    seed: "48201948",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-futuristic-subway-station-with-neon-lights-44132-large.mp4",
-    createdAt: "10 mins ago"
-  },
-  {
-    id: "hist-2",
-    prompt: "A mysterious foggy road in a deep forest at night, cinematic lighting",
-    duration: "10",
-    resolution: "1080p",
-    fps: 24,
-    style: "Cinematic",
-    motion: 4,
-    seed: "92810482",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-mysterious-foggy-forest-road-at-night-42861-large.mp4",
-    createdAt: "2 hours ago"
-  },
-  {
-    id: "hist-3",
-    prompt: "Flying through a neon digital grid cyber tunnel retrowave style",
-    duration: "5",
-    resolution: "720p",
-    fps: 30,
-    style: "Sci-Fi",
-    motion: 9,
-    seed: "10294827",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-flying-through-a-futuristic-neon-tunnel-44131-large.mp4",
-    createdAt: "1 day ago"
-  }
-];
+import Link from 'next/link';
+import { useAuthStore } from '../store/authStore';
+import { Sparkles, Zap, Video, CheckCircle } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function Home() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, init } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<string>("dashboard");
-  const [credits, setCredits] = useState<number>(840);
-  const [history, setHistory] = useState<VideoItem[]>(initialMockHistory);
-  
-  // Generator workspace states
-  const [prompt, setPrompt] = useState<string>("");
-  const [style, setStyle] = useState<string>("Cinematic");
-  const [duration, setDuration] = useState<string>("5");
-  const [resolution, setResolution] = useState<string>("1080p");
-  const [fps, setFps] = useState<string>("30");
-  const [motion, setMotion] = useState<number>(5);
-  const [seed, setSeed] = useState<string>("38291048");
-
-  // Simulation status states
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
-  const [statusMessage, setStatusMessage] = useState<string>("");
-  const [currentVideo, setCurrentVideo] = useState<VideoItem | null>(null);
-
-  // Auto scroll top on tab changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activeTab]);
+    init();
+  }, [init]);
 
-  const handleSelectTemplate = (template: Partial<VideoItem>) => {
-    if (template.prompt) setPrompt(template.prompt);
-    if (template.style) setStyle(template.style);
-    if (template.duration) setDuration(template.duration);
-    if (template.resolution) setResolution(template.resolution);
-    if (template.fps) setFps(template.fps.toString());
-    if (template.motion) setMotion(template.motion);
-    if (template.seed) setSeed(template.seed);
-    
-    // Switch to generate workspace
-    setActiveTab("generate");
-
-    // Clear output placeholder so user can generate it fresh
-    setCurrentVideo(null);
-  };
-
-  const handlePreviewVideo = (video: VideoItem) => {
-    setPrompt(video.prompt);
-    setStyle(video.style);
-    setDuration(video.duration);
-    setResolution(video.resolution);
-    setFps(video.fps.toString());
-    setMotion(video.motion);
-    setSeed(video.seed);
-    
-    // Highlight in player
-    setCurrentVideo(video);
-    setActiveTab("generate");
-  };
-
-  const handleDeleteHistoryItem = (id: string) => {
-    setHistory((prev) => prev.filter((item) => item.id !== id));
-    // If the active video is deleted, reset the current preview
-    if (currentVideo && currentVideo.id === id) {
-      setCurrentVideo(null);
-    }
-  };
-
-  const handleGenerate = () => {
-    if (!prompt.trim() || isGenerating) return;
-
-    setIsGenerating(true);
-    setProgress(0);
-    setStatusMessage("Connecting to GPU cluster...");
-
-    const intervalTime = 80; // ms
-    let currentProgress = 0;
-
-    const timer = setInterval(() => {
-      currentProgress += Math.floor(Math.random() * 4) + 1;
-      
-      if (currentProgress >= 100) {
-        currentProgress = 100;
-        clearInterval(timer);
-        
-        // Finalize generation
-        setIsGenerating(false);
-        setCredits((prev) => Math.max(0, prev - 10)); // Deduct credits
-        
-        // Choose video link based on style (fallback to Sci-Fi if missing)
-        const matchedVideoUrl = styleVideoMockups[style] || styleVideoMockups["Sci-Fi"];
-        
-        const newVideo: VideoItem = {
-          id: `vid-${Date.now()}`,
-          prompt,
-          duration,
-          resolution,
-          fps: Number(fps),
-          style,
-          motion,
-          seed: seed || Math.floor(Math.random() * 99999999).toString(),
-          videoUrl: matchedVideoUrl,
-          createdAt: "Just now",
-        };
-
-        setHistory((prev) => [newVideo, ...prev]);
-        setCurrentVideo(newVideo);
-      } else {
-        setProgress(currentProgress);
-        // Dynamic status updates based on progress steps
-        if (currentProgress < 25) {
-          setStatusMessage("Analyzing text prompt and optimizing embeddings...");
-        } else if (currentProgress < 50) {
-          setStatusMessage("Synthesizing latent frames (diffusion step 12/28)...");
-        } else if (currentProgress < 75) {
-          setStatusMessage("Applying temporal consistent weights...");
-        } else if (currentProgress < 92) {
-          setStatusMessage("Rendering frames to 3D convolutional space...");
-        } else {
-          setStatusMessage("Compiling H.264 stream for download...");
-        }
-      }
-    }, intervalTime);
-  };
-
-  // ── Loading State ──────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#050508]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 text-purple-500 animate-spin" />
-          <p className="text-zinc-500 text-sm font-medium">Loading VisionForge AI...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Auth Gate ──────────────────────────────────────────────────
-  if (!isAuthenticated) {
-    return <AuthPage />;
-  }
-
-  // ── Authenticated Studio ──────────────────────────────────────
   return (
-    <div className="flex min-h-screen bg-[#050508] relative">
-      {/* Background Soft Glow Effects */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-purple-600/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[600px] h-[600px] rounded-full bg-blue-500/5 blur-[150px] pointer-events-none" />
-      
-      {/* Sidebar Navigation */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        credits={credits}
-        userName={user?.name}
-        userEmail={user?.email}
-        userAvatar={user?.avatar}
-      />
-
-      {/* Main Studio Viewport */}
-      <main className="flex-1 min-h-screen flex flex-col grid-bg">
-        <header className="h-16 border-b border-white/5 px-8 flex items-center justify-between bg-[#050508]/40 backdrop-blur-md sticky top-0 z-30">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500 font-mono">VISIONFORGE STUDIO</span>
-            <span className="h-3 w-[1px] bg-white/10" />
-            <span className="text-xs font-semibold text-purple-400 font-mono uppercase">{activeTab}</span>
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] text-center px-4">
+      {/* Hero Section */}
+      <div className="relative w-full max-w-5xl mx-auto py-20">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-600/20 rounded-full blur-[100px] pointer-events-none" />
+        
+        <div className="relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-400 text-sm font-medium mb-8">
+            <Sparkles className="h-4 w-4" />
+            <span>Powered by Wan2.x Diffusion</span>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-zinc-400 font-mono font-medium tracking-wide">NODE: CUDA-US-EAST-01</span>
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
+            Transform Text into <br className="hidden md:block" />
+            <span className="text-gradient animate-glow">Stunning Videos</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            VisionForge brings your imagination to life. Generate high-quality, cinematic videos from simple text prompts in minutes.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {isAuthenticated ? (
+              <Link href="/dashboard" className="btn-primary text-lg px-8 py-4 w-full sm:w-auto">
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/register" className="btn-primary text-lg px-8 py-4 w-full sm:w-auto flex items-center justify-center gap-2">
+                  Start Creating Free
+                  <Zap className="h-5 w-5" />
+                </Link>
+                <Link href="/login" className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto">
+                  Sign In
+                </Link>
+              </>
+            )}
           </div>
-        </header>
-
-        {/* Tab View Switcher container */}
-        <div className="flex-1 p-8 max-w-7xl w-full mx-auto">
-          {activeTab === "dashboard" && (
-            <DashboardTab 
-              onNavigateToGenerate={() => setActiveTab("generate")}
-              onSelectTemplate={handleSelectTemplate}
-              recentVideos={history.slice(0, 3)}
-              onPreviewVideo={handlePreviewVideo}
-            />
-          )}
-
-          {activeTab === "generate" && (
-            <GenerateTab 
-              prompt={prompt}
-              setPrompt={setPrompt}
-              style={style}
-              setStyle={setStyle}
-              duration={duration}
-              setDuration={setDuration}
-              resolution={resolution}
-              setResolution={setResolution}
-              fps={fps}
-              setFps={setFps}
-              motion={motion}
-              setMotion={setMotion}
-              seed={seed}
-              setSeed={setSeed}
-              isGenerating={isGenerating}
-              progress={progress}
-              statusMessage={statusMessage}
-              onGenerate={handleGenerate}
-              currentVideo={currentVideo}
-            />
-          )}
-
-          {activeTab === "history" && (
-            <HistoryTab 
-              history={history}
-              onDeleteHistoryItem={handleDeleteHistoryItem}
-              onPreviewVideo={handlePreviewVideo}
-            />
-          )}
-
-          {activeTab === "settings" && (
-            <SettingsTab />
-          )}
         </div>
-      </main>
+      </div>
+
+      {/* Features Grid */}
+      <div className="w-full max-w-6xl mx-auto py-20 border-t border-surface-600/30">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="glass-card p-8 rounded-2xl text-left">
+            <div className="h-12 w-12 rounded-xl bg-brand-500/20 flex items-center justify-center mb-6">
+              <Video className="h-6 w-6 text-brand-400" />
+            </div>
+            <h3 className="text-xl font-bold mb-3">State of the Art</h3>
+            <p className="text-gray-400">Powered by the latest Wan2.x architecture for unparalleled generation quality and temporal consistency.</p>
+          </div>
+          
+          <div className="glass-card p-8 rounded-2xl text-left">
+            <div className="h-12 w-12 rounded-xl bg-accent-500/20 flex items-center justify-center mb-6">
+              <Zap className="h-6 w-6 text-accent-400" />
+            </div>
+            <h3 className="text-xl font-bold mb-3">Lightning Fast</h3>
+            <p className="text-gray-400">Distributed GPU processing ensures your videos render quickly, so you spend more time creating.</p>
+          </div>
+          
+          <div className="glass-card p-8 rounded-2xl text-left">
+            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center mb-6">
+              <CheckCircle className="h-6 w-6 text-green-400" />
+            </div>
+            <h3 className="text-xl font-bold mb-3">Complete Control</h3>
+            <p className="text-gray-400">Fine-tune aspect ratios, resolution, duration, and use initial images to guide the generation.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

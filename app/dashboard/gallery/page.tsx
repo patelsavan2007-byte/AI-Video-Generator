@@ -13,40 +13,57 @@ import {
   Sparkles,
   ExternalLink
 } from "lucide-react";
-import { VideoItem } from "@/app/page";
 import { AnimatePresence, motion } from "framer-motion";
+import { useVideos } from "@/lib/hooks/useVideos";
+import { useRouter } from "next/navigation";
 
-interface HistoryTabProps {
-  history: VideoItem[];
-  onDeleteHistoryItem: (id: string) => void;
-  onPreviewVideo: (video: VideoItem) => void;
-}
-
-export function HistoryTab({ 
-  history, 
-  onDeleteHistoryItem, 
-  onPreviewVideo 
-}: HistoryTabProps) {
-  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
+export default function GalleryPage() {
+  const { data: videos = [], isLoading } = useVideos();
+  const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
+  const router = useRouter();
 
   const downloadVideo = (url: string, style: string) => {
     const link = document.createElement("a");
     link.href = url;
-    link.download = `visionforge_${style.toLowerCase()}_${Date.now()}.mp4`;
+    link.download = `visionforge_${style?.toLowerCase() || 'video'}_${Date.now()}.mp4`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const handleDelete = (id: string) => {
+    // Dummy delete function for now
+    alert(`Delete video ${id} not fully implemented yet.`);
+  };
+
+  const handleRemix = (video: any) => {
+    const params = new URLSearchParams({
+      prompt: video.prompt,
+      duration: String(video.duration || 4),
+    });
+    router.push(`/dashboard/generate?${params.toString()}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Filter only completed videos
+  const completedVideos = videos.filter(v => v.status === 'completed' && v.video_url);
+
   return (
-    <div className="space-y-6">
+    <div className="p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-white tracking-tight">Generation History</h2>
         <p className="text-zinc-500 text-sm mt-1">Review, play, and download your previously generated AI videos.</p>
       </div>
 
-      {history.length === 0 ? (
+      {completedVideos.length === 0 ? (
         <div className="glass-card rounded-2xl border border-white/5 p-12 text-center flex flex-col items-center justify-center space-y-4">
           <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-500">
             <Video className="h-6 w-6" />
@@ -61,7 +78,7 @@ export function HistoryTab({
       ) : (
         /* History Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {history.map((video) => (
+          {completedVideos.map((video) => (
             <motion.div
               layout
               key={video.id}
@@ -76,7 +93,7 @@ export function HistoryTab({
                 className="relative aspect-video bg-zinc-950 flex items-center justify-center overflow-hidden cursor-pointer"
               >
                 <video 
-                  src={video.videoUrl} 
+                  src={video.video_url} 
                   className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500" 
                   muted 
                   playsInline 
@@ -97,7 +114,7 @@ export function HistoryTab({
                 
                 {/* Style Badge */}
                 <span className="absolute top-2 left-2 px-2.5 py-0.5 text-[9px] rounded-full bg-purple-500/85 font-semibold text-white border border-white/5 uppercase tracking-wider">
-                  {video.style}
+                  {video.resolution}
                 </span>
               </div>
 
@@ -111,14 +128,17 @@ export function HistoryTab({
 
                 <div className="flex items-center justify-between pt-3 border-t border-white/5">
                   <span className="text-[10px] font-mono text-zinc-500">
-                    {video.resolution} • {video.fps}fps
+                    {new Date(video.created_at).toLocaleDateString()}
                   </span>
                   
                   {/* Actions */}
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => downloadVideo(video.videoUrl, video.style)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (video.video_url) downloadVideo(video.video_url, "video");
+                      }}
                       className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
                       title="Download Video"
                     >
@@ -126,7 +146,10 @@ export function HistoryTab({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDeleteHistoryItem(video.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(video.id);
+                      }}
                       className="p-1.5 rounded-lg bg-red-950/20 border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-950/40 transition-colors"
                       title="Delete from History"
                     >
@@ -170,7 +193,7 @@ export function HistoryTab({
                 {/* Player Column - 7/12 */}
                 <div className="md:col-span-8 bg-black flex items-center justify-center aspect-video">
                   <video 
-                    src={selectedVideo.videoUrl} 
+                    src={selectedVideo.video_url} 
                     className="w-full h-full object-contain"
                     controls 
                     autoPlay 
@@ -199,22 +222,10 @@ export function HistoryTab({
                       </h4>
                       <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-[11px] font-mono text-zinc-400">
                         <div>
-                          Style: <span className="text-zinc-200 font-sans">{selectedVideo.style}</span>
-                        </div>
-                        <div>
                           Duration: <span className="text-zinc-200 font-sans">{selectedVideo.duration}s</span>
                         </div>
                         <div>
                           Resolution: <span className="text-zinc-200">{selectedVideo.resolution}</span>
-                        </div>
-                        <div>
-                          FPS: <span className="text-zinc-200">{selectedVideo.fps}</span>
-                        </div>
-                        <div>
-                          Motion: <span className="text-zinc-200">{selectedVideo.motion}/10</span>
-                        </div>
-                        <div className="truncate">
-                          Seed: <span className="text-zinc-200" title={selectedVideo.seed}>{selectedVideo.seed}</span>
                         </div>
                       </div>
                     </div>
@@ -225,7 +236,7 @@ export function HistoryTab({
                         Generated
                       </h4>
                       <p className="text-xs text-zinc-300 font-medium">
-                        {selectedVideo.createdAt}
+                        {new Date(selectedVideo.created_at).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -233,7 +244,7 @@ export function HistoryTab({
                   <div className="pt-6 border-t border-white/5 flex gap-2">
                     <button
                       type="button"
-                      onClick={() => downloadVideo(selectedVideo.videoUrl, selectedVideo.style)}
+                      onClick={() => downloadVideo(selectedVideo.video_url, "video")}
                       className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white transition-colors"
                     >
                       <Download className="h-3.5 w-3.5" />
@@ -241,12 +252,9 @@ export function HistoryTab({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        onPreviewVideo(selectedVideo);
-                        setSelectedVideo(null);
-                      }}
+                      onClick={() => handleRemix(selectedVideo)}
                       className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold text-zinc-300 transition-colors flex items-center justify-center"
-                      title="Load Settings back to Generate Tab"
+                      title="Remix this prompt"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </button>

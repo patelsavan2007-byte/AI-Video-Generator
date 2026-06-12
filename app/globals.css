@@ -1,18 +1,6 @@
-@import "tailwindcss";
-
-@theme {
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
-
-  --color-bg-dark: #070709;
-  --color-card-dark: rgba(13, 13, 18, 0.7);
-  --color-border-dark: rgba(255, 255, 255, 0.08);
-  --color-purple-glow: rgba(168, 85, 247, 0.15);
-  --color-blue-glow: rgba(59, 130, 246, 0.15);
-  
-  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-glow: glow 4s ease-in-out infinite alternate;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer utilities {
   .glass-card {
@@ -58,7 +46,6 @@ body {
   color: #f3f4f6;
   min-height: 100vh;
   overflow-x: hidden;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 /* Custom Scrollbar */

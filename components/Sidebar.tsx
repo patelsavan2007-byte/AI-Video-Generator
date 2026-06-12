@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
   Tv, 
@@ -12,25 +14,22 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useAuth } from "@/lib/auth-context";
 
 interface SidebarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  credits: number;
+  credits?: number;
   userName?: string;
   userEmail?: string;
   userAvatar?: string;
 }
 
-export function Sidebar({ activeTab, setActiveTab, credits, userName, userEmail, userAvatar }: SidebarProps) {
-  const { signOut } = useAuth();
+export function Sidebar({ credits = 1000, userName, userEmail, userAvatar }: SidebarProps) {
+  const pathname = usePathname();
 
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "generate", label: "Generate", icon: Tv },
-    { id: "history", label: "History", icon: History },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "generate", href: "/dashboard/generate", label: "Generate", icon: Tv },
+    { id: "history", href: "/dashboard/gallery", label: "History", icon: History },
+    { id: "settings", href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
 
   /** Get user initials for the avatar fallback */
@@ -67,12 +66,12 @@ export function Sidebar({ activeTab, setActiveTab, credits, userName, userEmail,
       <nav className="flex-1 px-4 py-6 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href));
 
           return (
-            <button
+            <Link
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              href={item.href}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 relative group",
                 isActive 
@@ -89,7 +88,7 @@ export function Sidebar({ activeTab, setActiveTab, credits, userName, userEmail,
               )}
               <Icon className={cn("h-4 w-4 relative z-10", isActive ? "text-purple-400" : "text-zinc-400 group-hover:text-zinc-200")} />
               <span className="relative z-10">{item.label}</span>
-            </button>
+            </Link>
           );
         })}
       </nav>
@@ -120,6 +119,7 @@ export function Sidebar({ activeTab, setActiveTab, credits, userName, userEmail,
       <div className="p-4 border-t border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           {userAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={userAvatar}
               alt={displayName}
@@ -138,7 +138,7 @@ export function Sidebar({ activeTab, setActiveTab, credits, userName, userEmail,
         </div>
         <button 
           title="Sign Out"
-          onClick={signOut}
+          onClick={() => {}}
           className="text-zinc-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-white/5 shrink-0"
         >
           <LogOut className="h-4 w-4" />

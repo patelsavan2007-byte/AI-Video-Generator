@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Sparkles, 
   Dices, 
-  Play, 
   Download, 
   RefreshCw, 
   Film, 
@@ -17,29 +16,9 @@ import {
 } from "lucide-react";
 import { SelectCustom } from "@/components/ui/select-custom";
 import { SliderCustom } from "@/components/ui/slider-custom";
-import { VideoItem } from "@/app/page";
-
-interface GenerateTabProps {
-  prompt: string;
-  setPrompt: (val: string) => void;
-  style: string;
-  setStyle: (val: string) => void;
-  duration: string;
-  setDuration: (val: string) => void;
-  resolution: string;
-  setResolution: (val: string) => void;
-  fps: string;
-  setFps: (val: string) => void;
-  motion: number;
-  setMotion: (val: number) => void;
-  seed: string;
-  setSeed: (val: string) => void;
-  isGenerating: boolean;
-  progress: number;
-  statusMessage: string;
-  onGenerate: () => void;
-  currentVideo: VideoItem | null;
-}
+import { useGenerate } from "@/lib/hooks/useGenerate";
+import { useJobPoller } from "@/lib/hooks/useJobPoller";
+import { useSearchParams } from "next/navigation";
 
 const randomPrompts = [
   "A futuristic samurai walking in neon Tokyo during heavy rain, dramatic backlighting, cybernetic details",
@@ -75,47 +54,64 @@ const fpsOptions = [
   { value: "60", label: "60 FPS (Smooth)" }
 ];
 
-export function GenerateTab({
-  prompt,
-  setPrompt,
-  style,
-  setStyle,
-  duration,
-  setDuration,
-  resolution,
-  setResolution,
-  fps,
-  setFps,
-  motion,
-  setMotion,
-  seed,
-  setSeed,
-  isGenerating,
-  progress,
-  statusMessage,
-  onGenerate,
-  currentVideo,
-}: GenerateTabProps) {
+export default function GeneratePage() {
+  const searchParams = useSearchParams();
+  
+  const [prompt, setPrompt] = useState("");
+  const [style, setStyle] = useState("Cinematic");
+  const [duration, setDuration] = useState("5");
+  const [resolution, setResolution] = useState("1080p");
+  const [fps, setFps] = useState("30");
+  const [motion, setMotion] = useState(5);
+  const [seed, setSeed] = useState(Math.floor(Math.random() * 9999999).toString());
+  
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  // Auto-fill from search params
+  useEffect(() => {
+    if (searchParams) {
+      if (searchParams.get("prompt")) setPrompt(searchParams.get("prompt")!);
+      if (searchParams.get("style")) setStyle(searchParams.get("style")!);
+      if (searchParams.get("duration")) setDuration(searchParams.get("duration")!);
+    }
+  }, [searchParams]);
+
+  const { mutate: generate, isPending: isStartingGeneration } = useGenerate();
+  const { data: jobData } = useJobPoller(jobId);
 
   const handleRandomize = () => {
     const randomIndex = Math.floor(Math.random() * randomPrompts.length);
     setPrompt(randomPrompts[randomIndex]);
-    
-    // Also randomize style sometimes
-    const randomStyles = ["Cinematic", "Anime", "Realistic", "Sci-Fi"];
-    const randomStyle = randomStyles[Math.floor(Math.random() * randomStyles.length)];
+    const randomStyle = stylesList[Math.floor(Math.random() * stylesList.length)].value;
     setStyle(randomStyle);
-
-    // Randomize seed
     setSeed(Math.floor(Math.random() * 99999999).toString());
   };
 
-  const handleSeedRandom = () => {
-    setSeed(Math.floor(Math.random() * 99999999).toString());
+  const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    
+    // Construct actual prompt to backend optionally including style
+    const fullPrompt = style ? `[Style: ${style}] ${prompt}` : prompt;
+
+    generate({
+      prompt: fullPrompt,
+      duration: parseFloat(duration),
+      fps: parseInt(fps),
+      resolution: resolution,
+      seed: parseInt(seed) || undefined,
+      aspect_ratio: "16:9"
+    }, {
+      onSuccess: (res) => {
+        setJobId(res.job_id);
+      },
+      onError: (err) => {
+        alert("Failed to start generation.");
+        console.error(err);
+      }
+    });
   };
 
   const downloadVideo = (url: string) => {
-    // Simulated download trigger
     const link = document.createElement("a");
     link.href = url;
     link.download = `visionforge_${style.toLowerCase()}_${Date.now()}.mp4`;
@@ -124,8 +120,13 @@ export function GenerateTab({
     document.body.removeChild(link);
   };
 
+  const isGenerating = isStartingGeneration || (jobData && (jobData.status === 'queued' || jobData.status === 'processing'));
+  const currentVideo = jobData?.status === 'completed' ? jobData : null;
+  const progress = jobData?.progress || 0;
+  const statusMessage = jobData?.status === 'queued' ? "Waiting for GPU allocation..." : "Processing video frames...";
+
   return (
-    <div className="space-y-6">
+    <div className="p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-white tracking-tight">AI Text-to-Video Generator</h2>
@@ -165,9 +166,9 @@ export function GenerateTab({
 
             <button
               type="button"
-              disabled={isGenerating || !prompt.trim()}
-              onClick={onGenerate}
-              className="w-full h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-purple-600 disabled:hover:to-blue-500 shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20 transition-all duration-300 transform active:scale-99"
+              disabled={!!isGenerating || !prompt.trim()}
+              onClick={handleGenerate}
+              className="w-full h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 text-white font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20 transition-all duration-300 transform active:scale-99"
             >
               {isGenerating ? (
                 <>
@@ -258,7 +259,7 @@ export function GenerateTab({
                   <label htmlFor="seed-input" className="text-xs text-zinc-400 font-medium">Seed</label>
                   <button
                     type="button"
-                    onClick={handleSeedRandom}
+                    onClick={() => setSeed(Math.floor(Math.random() * 99999999).toString())}
                     className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold"
                   >
                     Random
@@ -331,8 +332,8 @@ export function GenerateTab({
                 <div className="w-full space-y-5 flex-1 flex flex-col justify-between">
                   <div className="relative aspect-video rounded-xl bg-black border border-white/10 overflow-hidden group/player">
                     <video
-                      key={currentVideo.id}
-                      src={currentVideo.videoUrl}
+                      key={currentVideo.job_id}
+                      src={currentVideo.video_url}
                       className="w-full h-full object-cover"
                       controls
                       autoPlay
@@ -342,7 +343,7 @@ export function GenerateTab({
                     <div className="absolute top-2 right-2 opacity-0 group-hover/player:opacity-100 transition-opacity">
                       <button 
                         type="button"
-                        onClick={() => window.open(currentVideo.videoUrl, "_blank")}
+                        onClick={() => window.open(currentVideo.video_url, "_blank")}
                         className="h-8 w-8 rounded-lg bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white"
                         title="Expand"
                       >
@@ -355,7 +356,7 @@ export function GenerateTab({
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => downloadVideo(currentVideo.videoUrl)}
+                      onClick={() => currentVideo.video_url && downloadVideo(currentVideo.video_url)}
                       className="h-10 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold text-white transition-colors"
                     >
                       <Download className="h-4 w-4" />
@@ -363,7 +364,7 @@ export function GenerateTab({
                     </button>
                     <button
                       type="button"
-                      onClick={onGenerate}
+                      onClick={handleGenerate}
                       className="h-10 flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white transition-all shadow-md shadow-purple-500/10"
                     >
                       <RefreshCw className="h-4 w-4" />
@@ -379,7 +380,7 @@ export function GenerateTab({
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-zinc-400 font-mono">
                       <div>
-                        Style: <span className="text-zinc-200 font-semibold font-sans">{currentVideo.style}</span>
+                        Style: <span className="text-zinc-200 font-semibold font-sans">{style}</span>
                       </div>
                       <div>
                         Duration: <span className="text-zinc-200 font-semibold font-sans">{currentVideo.duration}s</span>
@@ -391,7 +392,7 @@ export function GenerateTab({
                         FPS: <span className="text-zinc-200 font-semibold">{currentVideo.fps}</span>
                       </div>
                       <div>
-                        Motion: <span className="text-zinc-200 font-semibold">{currentVideo.motion}/10</span>
+                        Motion: <span className="text-zinc-200 font-semibold">{motion}/10</span>
                       </div>
                       <div className="truncate">
                         Seed: <span className="text-zinc-200 font-semibold">{currentVideo.seed}</span>
