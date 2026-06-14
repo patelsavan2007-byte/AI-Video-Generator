@@ -75,6 +75,8 @@ services:
     env_file: ../.env
     ports:
       - "3000:3000"
+    environment:
+      - API_INTERNAL_URL=http://api:8000
     volumes:
       - ../frontend:/app
       - /app/node_modules       # anonymous volume keeps node_modules inside container

@@ -8,6 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from db.session import create_tables
 from routers import auth, generate, jobs, media
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import sys
+
+
 
 
 @asynccontextmanager
@@ -50,3 +55,11 @@ app.include_router(media.router)
 @app.get("/health", tags=["health"])
 async def health():
     return {"status": "ok", "debug_mode": settings.DEBUG_MODE}
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"Validation Error: {exc.errors()} \n Body: {exc.body}", file=sys.stderr)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )

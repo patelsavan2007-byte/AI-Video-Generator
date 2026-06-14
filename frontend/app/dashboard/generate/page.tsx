@@ -43,9 +43,9 @@ const durationOptions = [
 ];
 
 const resolutionOptions = [
-  { value: "720p", label: "720p (HD)" },
-  { value: "1080p", label: "1080p (Full HD)" },
-  { value: "4k", label: "4K (Ultra HD)" }
+  { value: "1280x720", label: "720p (HD)" },
+  { value: "1920x1080", label: "1080p (Full HD)" },
+  { value: "3840x2160", label: "4K (Ultra HD)" }
 ];
 
 const fpsOptions = [
@@ -60,7 +60,7 @@ export default function GeneratePage() {
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("Cinematic");
   const [duration, setDuration] = useState("5");
-  const [resolution, setResolution] = useState("1080p");
+  const [resolution, setResolution] = useState("1920x1080");
   const [fps, setFps] = useState("30");
   const [motion, setMotion] = useState(5);
   const [seed, setSeed] = useState(Math.floor(Math.random() * 9999999).toString());

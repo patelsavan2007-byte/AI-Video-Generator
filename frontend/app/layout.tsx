@@ -1,9 +1,6 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/Providers'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'VisionForge 2.0 | AI Text-to-Video Generation',
@@ -17,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} antialiased selection:bg-brand-500/30`}>
+      <body className="font-sans antialiased selection:bg-brand-500/30">
         <Providers>
           <div className="flex flex-col min-h-screen">
             <main className="flex-grow">
