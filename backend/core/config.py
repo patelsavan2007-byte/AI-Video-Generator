@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Debug mode — skips GPU/model, returns dummy MP4
     DEBUG_MODE: bool = False
 
+    # Hugging Face Upstream Generation
+    HF_TOKEN: str | None = None
+    HF_PROVIDER: str = "hf-inference"
+    HF_MODEL: str = "black-forest-labs/FLUX.1-dev"
+
 
 @lru_cache()
 def get_settings() -> Settings:

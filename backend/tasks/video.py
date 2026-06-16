@@ -114,6 +114,7 @@ def generate_video(
     seed: Optional[int] = None,
     aspect_ratio: str = "16:9",
     init_image_url: Optional[str] = None,
+    model: str = "wan2",
 ):
     """Main Celery task. Runs either DEBUG_MODE (dummy MP4) or real inference."""
     start_time = time.time()
@@ -141,8 +142,10 @@ def generate_video(
         output_path = video_dir / f"{job_id}.mp4"
         thumb_path = thumb_dir / f"{job_id}.jpg"
 
-        if settings.DEBUG_MODE:
+        if model == "dummy" or (settings.DEBUG_MODE and model == "wan2"):
             _run_debug_path(job_id, output_path, thumb_path, inter_dir)
+        elif model == "hf":
+            _run_hf_path(job_id, output_path, thumb_path, prompt, negative_prompt, duration, fps, resolution)
         else:
             _run_production_path(
                 job_id, output_path, thumb_path, inter_dir,
@@ -341,3 +344,48 @@ def _generate_thumbnail(video_path: Path, thumb_path: Path):
         from PIL import Image  # type: ignore
         img = Image.new("RGB", (854, 480), (26, 10, 46))
         img.save(str(thumb_path), "JPEG", quality=85)
+
+
+def _coerce_to_bytes(result) -> bytes:
+    if isinstance(result, bytes):
+        return result
+    if hasattr(result, "read"):
+        return result.read()
+    return bytes(result)
+
+
+def _run_hf_path(job_id: str, output_path: Path, thumb_path: Path, prompt: str, negative_prompt: Optional[str], duration: float, fps: int, resolution: str):
+    print(f"[worker-hf] Starting HF generation for job {job_id}")
+    from huggingface_hub import InferenceClient
+
+    if not settings.HF_TOKEN:
+        raise RuntimeError("HF_TOKEN is required for upstream generation.")
+
+    client = InferenceClient(provider=settings.HF_PROVIDER, token=settings.HF_TOKEN)
+
+    params = {}
+    if negative_prompt:
+        params["negative_prompt"] = negative_prompt
+
+    _set_progress(job_id, 10)
+
+    try:
+        result = client.text_to_video(
+            prompt=prompt,
+            model=settings.HF_MODEL,
+            **(params)
+        )
+    except Exception as e:
+        raise RuntimeError(f"HF Generation failed: {e}")
+
+    _set_progress(job_id, 80)
+
+    video_bytes = _coerce_to_bytes(result)
+
+    with open(output_path, "wb") as f:
+        f.write(video_bytes)
+
+    # Generate thumbnail
+    _generate_thumbnail(output_path, thumb_path)
+    _set_progress(job_id, 95)
+

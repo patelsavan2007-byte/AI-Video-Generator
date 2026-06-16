@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGenerate } from '../lib/hooks/useGenerate';
 import ImageUploader from './ImageUploader';
 import { Wand2, Settings2 } from 'lucide-react';
@@ -20,6 +20,19 @@ export default function PromptForm({ onJobStarted }: PromptFormProps) {
   const [resolution, setResolution] = useState('832x480'); // Wan2 typical wide res
   const [aspectRatio, setAspectRatio] = useState('16:9');
   
+  const [model, setModel] = useState('wan2');
+  const [debugMode, setDebugMode] = useState(false);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/health`)
+      .then(res => res.json())
+      .then(data => {
+        setDebugMode(data.debug_mode);
+        if (data.debug_mode) setModel('hf'); // Default to HF in debug mode if wan2 is not available
+      })
+      .catch(console.error);
+  }, []);
+
   const { mutate: generate, isPending } = useGenerate();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,6 +46,7 @@ export default function PromptForm({ onJobStarted }: PromptFormProps) {
       resolution,
       aspect_ratio: aspectRatio,
       init_image_url: initImageUrl || undefined,
+      model,
     }, {
       onSuccess: (data) => {
         onJobStarted(data.job_id);
@@ -63,6 +77,21 @@ export default function PromptForm({ onJobStarted }: PromptFormProps) {
             className="w-full input-field min-h-[120px] resize-none text-lg bg-surface-900/60"
             placeholder="A cinematic drone shot of a futuristic neon city at night, rain falling, reflections on the wet asphalt, cyberpunk aesthetic, 8k, highly detailed..."
           />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Model
+          </label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full input-field text-sm"
+          >
+            <option value="dummy">Dummy</option>
+            <option value="hf">Hugging Face</option>
+            {!debugMode && <option value="wan2">Wan 2.x</option>}
+          </select>
         </div>
 
         <ImageUploader onImageUploaded={setInitImageUrl} />

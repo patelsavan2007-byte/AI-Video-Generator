@@ -64,6 +64,18 @@ export default function GeneratePage() {
   const [fps, setFps] = useState("30");
   const [motion, setMotion] = useState(5);
   const [seed, setSeed] = useState(Math.floor(Math.random() * 9999999).toString());
+  const [model, setModel] = useState("wan2");
+  const [debugMode, setDebugMode] = useState(false);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/health`)
+      .then(res => res.json())
+      .then(data => {
+        setDebugMode(data.debug_mode);
+        if (data.debug_mode) setModel('hf');
+      })
+      .catch(console.error);
+  }, []);
   
   const [jobId, setJobId] = useState<string | null>(null);
 
@@ -99,7 +111,8 @@ export default function GeneratePage() {
       fps: parseInt(fps),
       resolution: resolution,
       seed: parseInt(seed) || undefined,
-      aspect_ratio: "16:9"
+      aspect_ratio: "16:9",
+      model: model
     }, {
       onSuccess: (res) => {
         setJobId(res.job_id);
@@ -213,6 +226,21 @@ export default function GeneratePage() {
                   options={fpsOptions}
                   value={fps}
                   onChange={setFps}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <label className="text-xs text-zinc-400 font-medium">Model</label>
+                <SelectCustom
+                  options={[
+                    { value: "dummy", label: "Dummy" },
+                    { value: "hf", label: "Hugging Face" },
+                    ...(debugMode ? [] : [{ value: "wan2", label: "Wan 2.x" }])
+                  ]}
+                  value={model}
+                  onChange={setModel}
                 />
               </div>
             </div>

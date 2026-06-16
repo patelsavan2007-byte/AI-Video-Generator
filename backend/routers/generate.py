@@ -62,6 +62,7 @@ async def generate_video(
             "seed": body.seed,
             "aspect_ratio": body.aspect_ratio,
             "init_image_url": body.init_image_url,
+            "model": body.model,
         },
         queue="video_gen",
     )

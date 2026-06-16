@@ -7,6 +7,7 @@ export interface GenerateRequest {
   seed?: number;
   aspect_ratio?: string;
   init_image_url?: string;
+  model?: string;
 }
 
 export interface GenerateResponse {

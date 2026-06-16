@@ -11,6 +11,7 @@ class GenerateRequest(BaseModel):
     seed: Optional[int] = Field(None, ge=0, le=2**32 - 1)
     aspect_ratio: str = Field("16:9", pattern=r"^\d+:\d+$")
     init_image_url: Optional[str] = Field(None, max_length=500)  # img2vid
+    model: str = Field("wan2", max_length=50)
 
 
 class GenerateResponse(BaseModel):
